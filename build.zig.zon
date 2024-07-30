@@ -1,0 +1,15 @@
+.{
+    .name = "vulkan_memory_allocator",
+    .version = "3.1.0",
+    .minimum_zig_version = "0.13.0",
+
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+        "LICENSE.txt",
+        "README.md",
+    },
+}

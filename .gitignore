@@ -4,3 +4,5 @@
 !/bin/VmaSample_Release_vs2022.exe
 !/bin/Shader*.spv
 .vscode/
+.zig-cache/
+zig-out/
