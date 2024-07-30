@@ -4,11 +4,18 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const zvma = b.addModule("root", .{
+        .root_source_file = b.path("lib.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const vma = b.addStaticLibrary(.{
         .name = "vma",
         .target = target,
         .optimize = optimize,
     });
+
+    zvma.linkLibrary(vma);
 
     const vulkan_sdk = try std.process.getEnvVarOwned(b.allocator, "VULKAN_SDK");
 
