@@ -28,6 +28,10 @@ pub fn build(b: *std.Build) !void {
         options_step.addOption(field.type, field.name, @field(options, field.name));
     }
 
+    vma.defineCMacro("VMA_VULKAN_VERSION", "1003000"); // Vulkan 1.3
+    vma.defineCMacro("VMA_STATIC_VULKAN_FUNCTIONS", "0"); // Dynamically load functions
+    vma.defineCMacro("VMA_DYNAMIC_VULKAN_FUNCTIONS", "0"); // Use fn ptrs defined by `p_vulkan_functions`
+
     vma.addIncludePath(b.path("include"));
     vma.addIncludePath(b.path("src"));
     vma.addIncludePath(b.path("include"));

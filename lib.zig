@@ -3,8 +3,511 @@ pub const vk = @import("vk.zig");
 pub const Allocator = enum(usize) { null_handle = 0, _ };
 pub const Allocation = enum(usize) { null_handle = 0, _ };
 pub const DefragmentationContext = enum(usize) { null_handle = 0, _ };
-pub const Pool = enum(usize) { null_handle = 0, _ };
+pub const VirtualAllocation = enum(u64) { null_handle = 0, _ };
 pub const VirtualBlock = enum(usize) { null_handle = 0, _ };
+pub const Pool = enum(usize) { null_handle = 0, _ };
+
+
+
+
+/// \brief Intended usage of the allocated memory.
+pub const MemoryUsage = packed struct(vk.Flags)
+{
+    // No intended memory usage specified.
+    // Use other members of VmaAllocationCreateInfo to specify your requirements.
+    unknown: bool = false,
+    // Obsolete, preserved for backward compatibility.
+    // Prefers `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`.
+    gpu_only: bool = false,
+    // Obsolete, preserved for backward compatibility.
+    // Guarantees `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT` and `VK_MEMORY_PROPERTY_HOST_COHERENT_BIT`.
+    cpu_only: bool = false,
+    // Obsolete, preserved for backward compatibility.
+    // Guarantees `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT`, prefers `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`.
+    cpu_to_gpu: bool = false,
+    // Obsolete, preserved for backward compatibility.
+    // Guarantees `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT`, prefers `VK_MEMORY_PROPERTY_HOST_CACHED_BIT`.
+    gpu_to_cpu: bool = false,
+    // Obsolete, preserved for backward compatibility.
+    // Prefers not `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`.
+    cpu_copy: bool = false,
+    // Lazily allocated GPU memory having `VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT`.
+    // Exists mostly on mobile platforms. Using it on desktop PC or other GPUs with no such memory type present will fail the allocation.
+    //
+    // Usage: Memory for transient attachment images (color attachments, depth attachments etc.), created with `VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT`.
+    //
+    // Allocations with this usage are always created as dedicated - it implies #VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT.
+    gpu_lazily_allocated: bool = false,
+    // Selects best memory type automatically.
+    // This flag is recommended for most common use cases.
+    //
+    // When using this flag, if you want to map the allocation (using vmaMapMemory() or #VMA_ALLOCATION_CREATE_MAPPED_BIT),
+    // you must pass one of the flags: #VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT or #VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    // in VmaAllocationCreateInfo::flags.
+    //
+    // It can be used only with functions that let the library know `VkBufferCreateInfo` or `VkImageCreateInfo`, e.g.
+    // vmaCreateBuffer(), vmaCreateImage(), vmaFindMemoryTypeIndexForBufferInfo(), vmaFindMemoryTypeIndexForImageInfo()
+    // and not with generic memory allocation functions.
+    auto: bool = false,
+    // Selects best memory type automatically with preference for GPU (device) memory.
+    //
+    // When using this flag, if you want to map the allocation (using vmaMapMemory() or #VMA_ALLOCATION_CREATE_MAPPED_BIT),
+    // you must pass one of the flags: #VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT or #VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    // in VmaAllocationCreateInfo::flags.
+    //
+    // It can be used only with functions that let the library know `VkBufferCreateInfo` or `VkImageCreateInfo`, e.g.
+    // vmaCreateBuffer(), vmaCreateImage(), vmaFindMemoryTypeIndexForBufferInfo(), vmaFindMemoryTypeIndexForImageInfo()
+    // and not with generic memory allocation functions.
+    auto_prefer_device: bool = false,
+    // Selects best memory type automatically with preference for CPU (host) memory.
+    //
+    // When using this flag, if you want to map the allocation (using vmaMapMemory() or #VMA_ALLOCATION_CREATE_MAPPED_BIT),
+    // you must pass one of the flags: #VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT or #VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+    // in VmaAllocationCreateInfo::flags.
+    //
+    // It can be used only with functions that let the library know `VkBufferCreateInfo` or `VkImageCreateInfo`, e.g.
+    // vmaCreateBuffer(), vmaCreateImage(), vmaFindMemoryTypeIndexForBufferInfo(), vmaFindMemoryTypeIndexForImageInfo()
+    // and not with generic memory allocation functions.
+    auto_prefer_host: bool = false,
+
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+
+/// Flags to be passed as AllocationCreateInfo::flags.
+pub const AllocationCreateFlags = packed struct(vk.Flags)
+{
+    // Set this flag if the allocation should have its own memory block.
+    //
+    // Use it for special, big resources, like fullscreen images used as attachments.
+    //
+    // If you use this flag while creating a buffer or an image, `VkMemoryDedicatedAllocateInfo`
+    // structure is applied if possible.
+    dedicated_memory_bit: bool = false,
+
+    // Set this flag to only try to allocate from existing `VkDeviceMemory` blocks and never create new such block.
+
+    // If new allocation cannot be placed in any of the existing blocks, allocation
+    // fails with `VK_ERROR_OUT_OF_DEVICE_MEMORY` error.
+
+    // You should not use #dedicated_memory_bit and
+    // #never_allocate_bit at the same time. It makes no sense.
+    never_allocate_bit: bool = false,
+    // Set this flag to use a memory that will be persistently mapped and retrieve pointer to it.
+    //
+    // Pointer to mapped memory will be returned through VmaAllocationInfo::pMappedData.
+    //
+    // It is valid to use this flag for allocation made from memory type that is not
+    // `HOST_VISIBLE`. This flag is then ignored and memory is not mapped. This is
+    // useful if you need an allocation that is efficient to use on GPU
+    // (`DEVICE_LOCAL`) and still want to map it directly if possible on platforms that
+    // support it (e.g. Intel GPU).
+    mapped_bit: bool = false,
+    // Preserved for backward compatibility. Consider using vmaSetAllocationName() instead.
+    //
+    // Set this flag to treat VmaAllocationCreateInfo::pUserData as pointer to a
+    // null-terminated string. Instead of copying pointer value, a local copy of the
+    // string is made and stored in allocation's `pName`. The string is automatically
+    // freed together with the allocation. It is also used in vmaBuildStatsString().
+    user_data_copy_string_bit: bool = false,
+    // Allocation will be created from upper stack in a double stack pool.
+    //
+    // This flag is only allowed for custom pools created with #VMA_POOL_CREATE_LINEAR_ALGORITHM_BIT flag.
+    upper_address_bit: bool = false,
+    // Create both buffer/image and allocation, but don't bind them together.
+    // It is useful when you want to bind yourself to do some more advanced binding, e.g. using some extensions.
+    // The flag is meaningful only with functions that bind by default: vmaCreateBuffer(), vmaCreateImage().
+    // Otherwise it is ignored.
+    //
+    // If you want to make sure the new buffer/image is not tied to the new memory allocation
+    // through `VkMemoryDedicatedAllocateInfoKHR` structure in case the allocation ends up in its own memory block,
+    // use also flag #can_alias_bit.
+    dont_bind_bit: bool = false,
+    // Create allocation only if additional device memory required for it, if any, won't exceed
+    // memory budget. Otherwise return `VK_ERROR_OUT_OF_DEVICE_MEMORY`.
+    within_budget_bit: bool = false,
+    // Set this flag if the allocated memory will have aliasing resources.
+    //
+    // Usage of this flag prevents supplying `VkMemoryDedicatedAllocateInfoKHR` when #dedicated_memory_bit is specified.
+    // Otherwise created dedicated memory will not be suitable for aliasing resources, resulting in Vulkan Validation Layer errors.
+    can_alias_bit: bool = false,
+    // Requests possibility to map the allocation (using vmaMapMemory() or #mapped_bit).
+    //
+    // - If you use #VMA_MEMORY_USAGE_AUTO or other `VMA_MEMORY_USAGE_AUTO*` value,
+    //   you must use this flag to be able to map the allocation. Otherwise, mapping is incorrect.
+    // - If you use other value of #VmaMemoryUsage, this flag is ignored and mapping is always possible in memory types that are `HOST_VISIBLE`.
+    //   This includes allocations created in \ref custom_memory_pools.
+    //
+    // Declares that mapped memory will only be written sequentially, e.g. using `memcpy()` or a loop writing number-by-number,
+    // never read or accessed randomly, so a memory type can be selected that is uncached and write-combined.
+    //
+    // Warning: Violating this declaration may work correctly, but will likely be very slow.
+    // Watch out for implicit reads introduced by doing e.g. `pMappedData[i] += x;`
+    // Better prepare your data in a local variable and `memcpy()` it to the mapped pointer all at once.
+    host_access_sequential_write_bit: bool = false,
+    // Requests possibility to map the allocation (using vmaMapMemory() or #mapped_bit).
+    //
+    // - If you use #VMA_MEMORY_USAGE_AUTO or other `VMA_MEMORY_USAGE_AUTO*` value,
+    //   you must use this flag to be able to map the allocation. Otherwise, mapping is incorrect.
+    // - If you use other value of #VmaMemoryUsage, this flag is ignored and mapping is always possible in memory types that are `HOST_VISIBLE`.
+    //   This includes allocations created in \ref custom_memory_pools.
+    //
+    // Declares that mapped memory can be read, written, and accessed in random order,
+    // so a `HOST_CACHED` memory type is preferred.
+    host_access_random_bit: bool = false,
+    // Together with #host_access_sequential_write_bit or #host_access_random_bit,
+    // it says that despite request for host access, a not-`HOST_VISIBLE` memory type can be selected
+    // if it may improve performance.
+    //
+    // By using this flag, you declare that you will check if the allocation ended up in a `HOST_VISIBLE` memory type
+    // (e.g. using vmaGetAllocationMemoryProperties()) and if not, you will create some "staging" buffer and
+    // issue an explicit transfer to write/read your data.
+    // To prepare for this possibility, don't forget to add appropriate flags like
+    // `VK_BUFFER_USAGE_TRANSFER_DST_BIT`, `VK_BUFFER_USAGE_TRANSFER_SRC_BIT` to the parameters of created buffer or image.
+    host_access_allow_transfer_instead_bit: bool = false,
+    // Allocation strategy that chooses smallest possible free range for the allocation
+    // to minimize memory usage and fragmentation, possibly at the expense of allocation time.
+    strategy_min_memory_bit: bool = false,
+    // Allocation strategy that chooses first suitable free range for the allocation -
+    // not necessarily in terms of the smallest offset but the one that is easiest and fastest to find
+    // to minimize allocation time, possibly at the expense of allocation quality.
+    strategy_min_time_bit: bool = false,
+    // Allocation strategy that chooses always the lowest offset in available space.
+    // This is not the most efficient strategy but achieves highly packed data.
+    // Used internally by defragmentation, not recommended in typical usage.
+    strategy_min_offset_bit: bool = false,
+
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+pub const AllocationCreateFlagStrategyBestFit: AllocationCreateFlags = .{
+    .strategy_min_memory_bit = true,
+};
+
+pub const AllocationCreateFlagStrategyFirstFit: AllocationCreateFlags = .{
+    .strategy_min_time_bit = true,
+};
+
+pub const AllocationCreateFlagStrategyMask: AllocationCreateFlags = .{
+    .strategy_min_memory_bit = true,
+    .strategy_min_time_bit = true,
+    .strategy_min_offset_bit = true
+};
+
+
+/// Flags to be passed as PoolCreateInfo::flags.
+pub const PoolCreateFlags = packed struct(vk.Flags)
+{
+    _reserved_bit_00: bool = false,
+
+    // Use this flag if you always allocate only buffers and linear images or only optimal images out of this pool and so Buffer-Image Granularity can be ignored.
+    //
+    // This is an optional optimization flag.
+    //
+    // If you always allocate using vmaCreateBuffer(), vmaCreateImage(),
+    // vmaAllocateMemoryForBuffer(), then you don't need to use it because allocator
+    // knows exact type of your allocations so it can handle Buffer-Image Granularity
+    // in the optimal way.
+    //
+    // If you also allocate using vmaAllocateMemoryForImage() or vmaAllocateMemory(),
+    // exact type of such allocations is not known, so allocator must be conservative
+    // in handling Buffer-Image Granularity, which can lead to suboptimal allocation
+    // (wasted memory). In that case, if you can make sure you always allocate only
+    // buffers and linear images or only optimal images out of this pool, use this flag
+    // to make allocator disregard Buffer-Image Granularity and so make allocations
+    // faster and more optimal.
+    // */
+    ignore_buffer_image_granularity_bit: bool = false,
+
+    // Enables alternative, linear allocation algorithm in this pool.
+    //
+    // Specify this flag to enable linear allocation algorithm, which always creates
+    // new allocations after last one and doesn't reuse space from allocations freed in
+    // between. It trades memory consumption for simplified algorithm and data
+    // structure, which has better performance and uses less memory for metadata.
+    //
+    // By using this flag, you can achieve behavior of free-at-once, stack,
+    // ring buffer, and double stack.
+    // For details, see documentation chapter \ref linear_algorithm.
+    linear_algorithm_bit: bool = false,
+
+    _reserved_bit_03: bool = false,
+    _reserved_bit_04: bool = false,
+    _reserved_bit_05: bool = false,
+    _reserved_bit_06: bool = false,
+    _reserved_bit_07: bool = false,
+    _reserved_bit_08: bool = false,
+    _reserved_bit_09: bool = false,
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+pub const PoolCreateFlagsAlgorithmMask: PoolCreateFlags = .{ .linear_algorithm_bit = true };
+
+
+/// Flags to be passed as DefragmentationInfo::flags.
+pub const DefragmentationFlags = packed struct(vk.Flags)
+{
+    // Use simple but fast algorithm for defragmentation.
+    // May not achieve best results but will require least time to compute and least allocations to copy.
+    algorithm_fast_bit: bool = false,
+    // Default defragmentation algorithm, applied also when no `ALGORITHM` flag is specified.
+    // Offers a balance between defragmentation quality and the amount of allocations and bytes that need to be moved.
+    algorithm_balanced_bit: bool = false,
+    // Perform full defragmentation of memory.
+    // Can result in notably more time to compute and allocations to copy, but will achieve best memory packing.
+    algorithm_full_bit: bool = false,
+    // Use the most roboust algorithm at the cost of time to compute and number of copies to make.
+    // Only available when bufferImageGranularity is greater than 1, since it aims to reduce
+    // alignment issues between different types of resources.
+    // Otherwise falls back to same behavior as #algorithm_full_bit.
+    algorithm_extensive_bit: bool = false,
+
+    _reserved_bit_04: bool = false,
+    _reserved_bit_05: bool = false,
+    _reserved_bit_06: bool = false,
+    _reserved_bit_07: bool = false,
+    _reserved_bit_08: bool = false,
+    _reserved_bit_09: bool = false,
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+/// A bit mask to extract only `ALGORITHM` bits from entire set of flags.
+pub const DefragmentationFlagsAlgorithmMask: DefragmentationFlags = .{
+    .algorithm_fast_bit = true,
+    .algorithm_balanced_bit = true,
+    .algorithm_full_bit = true,
+    .algorithm_extensive_bit = true,
+};
+
+/// Operation performed on single defragmentation move. See structure #VmaDefragmentationMove.
+pub const DefragmentationMoveOperation = packed struct(vk.Flags)
+{
+    /// Buffer/image has been recreated at `dstTmpAllocation`, data has been copied, old buffer/image has been destroyed. `srcAllocation` should be changed to point to the new place. This is the default value set by vmaBeginDefragmentationPass().
+    copy: bool = false,
+    /// Set this value if you cannot move the allocation. New place reserved at `dstTmpAllocation` will be freed. `srcAllocation` will remain unchanged.
+    ignore: bool = false,
+    /// Set this value if you decide to abandon the allocation and you destroyed the buffer/image. New place reserved at `dstTmpAllocation` will be freed, along with `srcAllocation`, which will be destroyed.
+    destroy: bool = false,
+
+    _reserved_bit_03: bool = false,
+    _reserved_bit_04: bool = false,
+    _reserved_bit_05: bool = false,
+    _reserved_bit_06: bool = false,
+    _reserved_bit_07: bool = false,
+    _reserved_bit_08: bool = false,
+    _reserved_bit_09: bool = false,
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+/// Flags to be passed as VirtualBlockCreateInfo::flags.
+pub const VirtualBlockCreateFlags = packed struct(vk.Flags)
+{
+    // Enables alternative, linear allocation algorithm in this virtual block.
+    //
+    // Specify this flag to enable linear allocation algorithm, which always creates
+    // new allocations after last one and doesn't reuse space from allocations freed in
+    // between. It trades memory consumption for simplified algorithm and data
+    // structure, which has better performance and uses less memory for metadata.
+    //
+    // By using this flag, you can achieve behavior of free-at-once, stack,
+    // ring buffer, and double stack.
+    // For details, see documentation chapter \ref linear_algorithm.
+    linear_algorithm_bit: bool = false,
+
+    _reserved_bit_01: bool = false,
+    _reserved_bit_02: bool = false,
+    _reserved_bit_03: bool = false,
+    _reserved_bit_04: bool = false,
+    _reserved_bit_05: bool = false,
+    _reserved_bit_06: bool = false,
+    _reserved_bit_07: bool = false,
+    _reserved_bit_08: bool = false,
+    _reserved_bit_09: bool = false,
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+// Bit mask to extract only `ALGORITHM` bits from entire set of flags.
+pub const VirtualBlockCreateFlagsAlgorithmMask: VirtualBlockCreateFlags = .{ .linear_algorithm_bit = true };
+
+
+/// Flags to be passed as VirtualAllocationCreateInfo::flags.
+pub const VirtualAllocationCreateFlags = packed struct(vk.Flags)
+{
+    _reserved_bit_00: bool = false,
+    _reserved_bit_01: bool = false,
+    _reserved_bit_02: bool = false,
+    _reserved_bit_03: bool = false,
+
+    // Allocation will be created from upper stack in a double stack pool.
+    //
+    // This flag is only allowed for virtual blocks created with #VirtualBlockCreateFlags.linear_algorithm_bit flag.
+    upper_address_bit: bool = false,
+
+    _reserved_bit_05: bool = false,
+    _reserved_bit_06: bool = false,
+    _reserved_bit_07: bool = false,
+    _reserved_bit_08: bool = false,
+    _reserved_bit_09: bool = false,
+    _reserved_bit_10: bool = false,
+
+    // Allocation strategy that tries to minimize memory usage.
+    strategy_min_memory_bit: bool = false,
+    // Allocation strategy that tries to minimize allocation time.
+    strategy_min_time_bit: bool = false,
+    // Allocation strategy that chooses always the lowest offset in available space.
+    // This is not the most efficient strategy but achieves highly packed data.
+    strategy_min_offset_bit: bool = false,
+
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
+
+// A bit mask to extract only `STRATEGY` bits from entire set of flags.
+//
+// These strategy flags are binary compatible with equivalent flags in #AllocationCreateFlags.
+pub const VirtualAllocationCreateFlagsStrategyMask: VirtualAllocationCreateFlags = .{
+    .strategy_min_memory_bit = true,
+    .strategy_min_offset_bit = true,
+    .strategy_min_time_bit = true,
+};
 
 /// Callback function called after successful vkAllocateMemory.
 pub const PfnAllocateDeviceMemoryFunction = ?*const fn (
@@ -39,7 +542,6 @@ pub const DeviceMemoryCallbacks = extern struct {
     /// Optional, can be null.
     p_user_data: ?*anyopaque,
 };
-
 
 // Pointers to some Vulkan functions - a subset used by the library.
 //
@@ -83,86 +585,216 @@ pub const VulkanFunctions = struct
     vkGetDeviceImageMemoryRequirements: vk.PfnGetDeviceImageMemoryRequirementsKHR,
 };
 
-/// Description of a Allocator to be created.
-typedef struct VmaAllocatorCreateInfo
+pub const AllocatorCreateFlags = packed struct(vk.Flags)
 {
-    /// Flags for created allocator. Use #VmaAllocatorCreateFlagBits enum.
-    VmaAllocatorCreateFlags flags;
-    /// Vulkan physical device.
-    /** It must be valid throughout whole lifetime of created allocator. */
-    VkPhysicalDevice VMA_NOT_NULL physicalDevice;
-    /// Vulkan device.
-    /** It must be valid throughout whole lifetime of created allocator. */
-    VkDevice VMA_NOT_NULL device;
-    /// Preferred size of a single `VkDeviceMemory` block to be allocated from large heaps > 1 GiB. Optional.
-    /** Set to 0 to use default, which is currently 256 MiB. */
-    VkDeviceSize preferredLargeHeapBlockSize;
-    /// Custom CPU memory allocation callbacks. Optional.
-    /** Optional, can be null. When specified, will also be used for all CPU-side memory allocations. */
-    const VkAllocationCallbacks* VMA_NULLABLE pAllocationCallbacks;
-    /// Informative callbacks for `vkAllocateMemory`, `vkFreeMemory`. Optional.
-    /** Optional, can be null. */
-    const VmaDeviceMemoryCallbacks* VMA_NULLABLE pDeviceMemoryCallbacks;
-    /** \brief Either null or a pointer to an array of limits on maximum number of bytes that can be allocated out of particular Vulkan memory heap.
+    // Allocator and all objects created from it will not be synchronized internally, so you must guarantee they are used from only one thread at a time or synchronized externally by you.
+    //
+    // Using this flag may increase performance because internal mutexes are not used.
+    externally_synchronized_bit: bool = false,
+    // Enables usage of VK_KHR_dedicated_allocation extension.
+    //
+    // The flag works only if AllocatorCreateInfo::vulkan_api_version `== VK_API_VERSION_1_0`.
+    // When it is `VK_API_VERSION_1_1`, the flag is ignored because the extension has been promoted to Vulkan 1.1.
+    //
+    // Using this extension will automatically allocate dedicated blocks of memory for
+    // some buffers and images instead of suballocating place for them out of bigger
+    // memory blocks (as if you explicitly used #VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT
+    // flag) when it is recommended by the driver. It may improve performance on some
+    // GPUs.
+    //
+    // You may set this flag only if you found out that following device extensions are
+    // supported, you enabled them while creating Vulkan device passed as
+    // AllocatorCreateInfo::device, and you want them to be used internally by this
+    // library:
+    //
+    // - VK_KHR_get_memory_requirements2 (device extension)
+    // - VK_KHR_dedicated_allocation (device extension)
+    //
+    // When this flag is set, you can experience following warnings reported by Vulkan
+    // validation layer. You can ignore them.
+    //
+    // > vkBindBufferMemory(): Binding memory to buffer 0x2d but vkGetBufferMemoryRequirements() has not been called on that buffer.
+    khr_dedicated_allocation_bit: bool = false,
+    // Enables usage of VK_KHR_bind_memory2 extension.
+    //
+    // The flag works only if AllocatorCreateInfo::vulkan_api_version `== VK_API_VERSION_1_0`.
+    // When it is `VK_API_VERSION_1_1`, the flag is ignored because the extension has been promoted to Vulkan 1.1.
+    //
+    // You may set this flag only if you found out that this device extension is supported,
+    // you enabled it while creating Vulkan device passed as AllocatorCreateInfo::device,
+    // and you want it to be used internally by this library.
+    //
+    // The extension provides functions `vkBindBufferMemory2KHR` and `vkBindImageMemory2KHR`,
+    // which allow to pass a chain of `pNext` structures while binding.
+    // This flag is required if you use `pNext` parameter in vmaBindBufferMemory2() or vmaBindImageMemory2().
+    khr_bind_memory2_bit: bool = false,
+    // Enables usage of VK_EXT_memory_budget extension.
+    //
+    // You may set this flag only if you found out that this device extension is supported,
+    // you enabled it while creating Vulkan device passed as VmaAllocatorCreateInfo::device,
+    // and you want it to be used internally by this library, along with another instance extension
+    // VK_KHR_get_physical_device_properties2, which is required by it (or Vulkan 1.1, where this extension is promoted).
+    //
+    // The extension provides query for current memory usage and budget, which will probably
+    // be more accurate than an estimation used by the library otherwise.
+    ext_memory_budget_bit: bool = false,
+    // Enables usage of VK_AMD_device_coherent_memory extension.
+    //
+    // You may set this flag only if you:
+    //
+    // - found out that this device extension is supported and enabled it while creating Vulkan device passed as VmaAllocatorCreateInfo::device,
+    // - checked that `VkPhysicalDeviceCoherentMemoryFeaturesAMD::deviceCoherentMemory` is true and set it while creating the Vulkan device,
+    // - want it to be used internally by this library.
+    //
+    // The extension and accompanying device feature provide access to memory types with
+    // `VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD` and `VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD` flags.
+    // They are useful mostly for writing breadcrumb markers - a common method for debugging GPU crash/hang/TDR.
+    //
+    // When the extension is not enabled, such memory types are still enumerated, but their usage is illegal.
+    // To protect from this error, if you don't create the allocator with this flag, it will refuse to allocate any memory or create a custom pool in such memory type,
+    // returning `VK_ERROR_FEATURE_NOT_PRESENT`.
+    amd_device_coherent_memory_bit: bool = false,
+    // Enables usage of "buffer device address" feature, which allows you to use function
+    // `vkGetBufferDeviceAddress*` to get raw GPU pointer to a buffer and pass it for usage inside a shader.
+    //
+    // You may set this flag only if you:
+    //
+    // 1. (For Vulkan version < 1.2) Found as available and enabled device extension
+    // VK_KHR_buffer_device_address.
+    // This extension is promoted to core Vulkan 1.2.
+    // 2. Found as available and enabled device feature `VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress`.
+    //
+    // When this flag is set, you can create buffers with `VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT` using VMA.
+    // The library automatically adds `VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT` to
+    // allocated memory blocks wherever it might be needed.
+    //
+    // For more information, see documentation chapter \ref enabling_buffer_device_address.
+    buffer_device_address_bit: bool = false,
+    // Enables usage of VK_EXT_memory_priority extension in the library.
+    //
+    // You may set this flag only if you found available and enabled this device extension,
+    // along with `VkPhysicalDeviceMemoryPriorityFeaturesEXT::memoryPriority == VK_TRUE`,
+    // while creating Vulkan device passed as AllocatorCreateInfo::device.
+    //
+    // When this flag is used, AllocationCreateInfo::priority and PoolCreateInfo::priority
+    // are used to set priorities of allocated Vulkan memory. Without it, these variables are ignored.
+    //
+    // A priority must be a floating-point value between 0 and 1, indicating the priority of the allocation relative to other memory allocations.
+    // Larger values are higher priority. The granularity of the priorities is implementation-dependent.
+    // It is automatically passed to every call to `vkAllocateMemory` done by the library using structure `VkMemoryPriorityAllocateInfoEXT`.
+    // The value to be used for default priority is 0.5.
+    // For more details, see the documentation of the VK_EXT_memory_priority extension.
+    ext_memory_priority_bit: bool = false,
+    // Enables usage of VK_KHR_maintenance4 extension in the library.
+    //
+    // You may set this flag only if you found available and enabled this device extension,
+    // while creating Vulkan device passed as VmaAllocatorCreateInfo::device.
+    khr_maintenance4_bit: bool = false,
+    // Enables usage of VK_KHR_maintenance5 extension in the library.
+    //
+    // You should set this flag if you found available and enabled this device extension,
+    // while creating Vulkan device passed as VmaAllocatorCreateInfo::device.
+    khr_maintenance5_bit: bool = false,
 
-    If not NULL, it must be a pointer to an array of
-    `VkPhysicalDeviceMemoryProperties::memoryHeapCount` elements, defining limit on
-    maximum number of bytes that can be allocated out of particular Vulkan memory
-    heap.
+    _reserved_bit_9: bool = false,
+    _reserved_bit_10: bool = false,
+    _reserved_bit_11: bool = false,
+    _reserved_bit_12: bool = false,
+    _reserved_bit_13: bool = false,
+    _reserved_bit_14: bool = false,
+    _reserved_bit_15: bool = false,
+    _reserved_bit_16: bool = false,
+    _reserved_bit_17: bool = false,
+    _reserved_bit_18: bool = false,
+    _reserved_bit_19: bool = false,
+    _reserved_bit_20: bool = false,
+    _reserved_bit_21: bool = false,
+    _reserved_bit_22: bool = false,
+    _reserved_bit_23: bool = false,
+    _reserved_bit_24: bool = false,
+    _reserved_bit_25: bool = false,
+    _reserved_bit_26: bool = false,
+    _reserved_bit_27: bool = false,
+    _reserved_bit_28: bool = false,
+    _reserved_bit_29: bool = false,
+    _reserved_bit_30: bool = false,
+    _reserved_bit_31: bool = false,
+};
 
-    Any of the elements may be equal to `VK_WHOLE_SIZE`, which means no limit on that
-    heap. This is also the default in case of `pHeapSizeLimit` = NULL.
+/// Description of a Allocator to be created.
+pub const AllocatorCreateInfo = extern struct
+{
+    // Flags for created allocator. Use #VmaAllocatorCreateFlagBits enum.
+    flags: AllocatorCreateFlags,
+    // Vulkan physical device.
+    // It must be valid throughout whole lifetime of created allocator.
+    physical_device: vk.PhysicalDevice,
+    // Vulkan device.
+    // It must be valid throughout whole lifetime of created allocator.
+    device: vk.Device,
+    // Preferred size of a single `VkDeviceMemory` block to be allocated from large heaps > 1 GiB. Optional.
+    // Set to 0 to use default, which is currently 256 MiB.
+    preferred_large_heap_block_size: vk.DeviceSize = 0,
+    // Custom CPU memory allocation callbacks. Optional.
+    // Optional, can be null. When specified, will also be used for all CPU-side memory allocations.
+    p_allocation_callbacks: ?*const vk.AllocationCallbacks = null,
+    // Informative callbacks for `vkAllocateMemory`, `vkFreeMemory`. Optional.
+    // Optional, can be null.
+    p_device_memory_callbacks: ?*const DeviceMemoryCallbacks = null,
+    // Either null or a pointer to an array of limits on maximum number of bytes that can be allocated out of particular Vulkan memory heap.
+    //
+    // If not NULL, it must be a pointer to an array of
+    // `VkPhysicalDeviceMemoryProperties::memoryHeapCount` elements, defining limit on
+    // maximum number of bytes that can be allocated out of particular Vulkan memory
+    // heap.
+    //
+    // Any of the elements may be equal to `VK_WHOLE_SIZE`, which means no limit on that
+    // heap. This is also the default in case of `pHeapSizeLimit` = NULL.
+    //
+    // If there is a limit defined for a heap:
+    //
+    // - If user tries to allocate more memory from that heap using this allocator,
+    //   the allocation fails with `VK_ERROR_OUT_OF_DEVICE_MEMORY`.
+    // - If the limit is smaller than heap size reported in `VkMemoryHeap::size`, the
+    //   value of this limit will be reported instead when using vmaGetMemoryProperties().
+    //
+    // Warning! Using this feature may not be equivalent to installing a GPU with
+    // smaller amount of memory, because graphics driver doesn't necessary fail new
+    // allocations with `VK_ERROR_OUT_OF_DEVICE_MEMORY` result when memory capacity is
+    // exceeded. It may return success and just silently migrate some device memory
+    // blocks to system RAM. This driver behavior can also be controlled using
+    // VK_AMD_memory_overallocation_behavior extension.
+    // */
+    p_heap_size_limit: ?*const vk.DeviceSize = null,
 
-    If there is a limit defined for a heap:
-
-    - If user tries to allocate more memory from that heap using this allocator,
-      the allocation fails with `VK_ERROR_OUT_OF_DEVICE_MEMORY`.
-    - If the limit is smaller than heap size reported in `VkMemoryHeap::size`, the
-      value of this limit will be reported instead when using vmaGetMemoryProperties().
-
-    Warning! Using this feature may not be equivalent to installing a GPU with
-    smaller amount of memory, because graphics driver doesn't necessary fail new
-    allocations with `VK_ERROR_OUT_OF_DEVICE_MEMORY` result when memory capacity is
-    exceeded. It may return success and just silently migrate some device memory
-    blocks to system RAM. This driver behavior can also be controlled using
-    VK_AMD_memory_overallocation_behavior extension.
-    */
-    const VkDeviceSize* VMA_NULLABLE VMA_LEN_IF_NOT_NULL("VkPhysicalDeviceMemoryProperties::memoryHeapCount") pHeapSizeLimit;
-
-    /** \brief Pointers to Vulkan functions. Can be null.
-
-    For details see [Pointers to Vulkan functions](@ref config_Vulkan_functions).
-    */
-    const VmaVulkanFunctions* VMA_NULLABLE pVulkanFunctions;
-    /** \brief Handle to Vulkan instance object.
-
-    Starting from version 3.0.0 this member is no longer optional, it must be set!
-    */
-    VkInstance VMA_NOT_NULL instance;
-    /** \brief Optional. Vulkan version that the application uses.
-
-    It must be a value in the format as created by macro `VK_MAKE_VERSION` or a constant like: `VK_API_VERSION_1_1`, `VK_API_VERSION_1_0`.
-    The patch version number specified is ignored. Only the major and minor versions are considered.
-    Only versions 1.0, 1.1, 1.2, 1.3 are supported by the current implementation.
-    Leaving it initialized to zero is equivalent to `VK_API_VERSION_1_0`.
-    It must match the Vulkan version used by the application and supported on the selected physical device,
-    so it must be no higher than `VkApplicationInfo::apiVersion` passed to `vkCreateInstance`
-    and no higher than `VkPhysicalDeviceProperties::apiVersion` found on the physical device used.
-    */
-    uint32_t vulkanApiVersion;
-#if VMA_EXTERNAL_MEMORY
-    /** \brief Either null or a pointer to an array of external memory handle types for each Vulkan memory type.
-
-    If not NULL, it must be a pointer to an array of `VkPhysicalDeviceMemoryProperties::memoryTypeCount`
-    elements, defining external memory handle types of particular Vulkan memory type,
-    to be passed using `VkExportMemoryAllocateInfoKHR`.
-
-    Any of the elements may be equal to 0, which means not to use `VkExportMemoryAllocateInfoKHR` on this memory type.
-    This is also the default in case of `pTypeExternalMemoryHandleTypes` = NULL.
-    */
-    const VkExternalMemoryHandleTypeFlagsKHR* VMA_NULLABLE VMA_LEN_IF_NOT_NULL("VkPhysicalDeviceMemoryProperties::memoryTypeCount") pTypeExternalMemoryHandleTypes;
-#endif // #if VMA_EXTERNAL_MEMORY
-} VmaAllocatorCreateInfo;
+    // Pointers to Vulkan functions. Can be null.
+    //
+    // For details see [Pointers to Vulkan functions](@ref config_Vulkan_functions).
+    p_vulkan_functions: ?*const VulkanFunctions = null,
+    // Handle to Vulkan instance object.
+    //
+    // Starting from version 3.0.0 this member is no longer optional, it must be set!
+    instance: vk.Instance,
+    // Optional. Vulkan version that the application uses.
+    //
+    // It must be a value in the format as created by macro `VK_MAKE_VERSION` or a constant like: `VK_API_VERSION_1_1`, `VK_API_VERSION_1_0`.
+    // The patch version number specified is ignored. Only the major and minor versions are considered.
+    // Only versions 1.0, 1.1, 1.2, 1.3 are supported by the current implementation.
+    // Leaving it initialized to zero is equivalent to `VK_API_VERSION_1_0`.
+    // It must match the Vulkan version used by the application and supported on the selected physical device,
+    // so it must be no higher than `VkApplicationInfo::apiVersion` passed to `vkCreateInstance`
+    // and no higher than `VkPhysicalDeviceProperties::apiVersion` found on the physical device used.
+    vulkan_api_version: u32 = vk.API_VERSION_1_3,
+    // Either null or a pointer to an array of external memory handle types for each Vulkan memory type.
+    //
+    // If not NULL, it must be a pointer to an array of `VkPhysicalDeviceMemoryProperties::memoryTypeCount`
+    // elements, defining external memory handle types of particular Vulkan memory type,
+    // to be passed using `VkExportMemoryAllocateInfoKHR`.
+    //
+    // Any of the elements may be equal to 0, which means not to use `VkExportMemoryAllocateInfoKHR` on this memory type.
+    // This is also the default in case of `pTypeExternalMemoryHandleTypes` = NULL.
+    p_type_external_memory_handle_types: ?*const vk.ExternalMemoryHandleTypeFlagsKHR = null,
+};
 
 /// Information about existing #VmaAllocator object.
 pub const AllocatorInfo = extern struct
@@ -249,8 +881,8 @@ pub const DetailedStatistics = extern struct
 // See function calculateStatistics().
 pub const TotalStatistics = extern struct
 {
-    memory_type: [VK_MAX_MEMORY_TYPES]DetailedStatistics,
-    memory_heap: [VK_MAX_MEMORY_HEAPS]DetailedStatistics,
+    memory_type: [vk.MAX_MEMORY_TYPES]DetailedStatistics,
+    memory_heap: [vk.MAX_MEMORY_HEAPS]DetailedStatistics,
     total: DetailedStatistics,
 };
 
@@ -282,9 +914,9 @@ pub const Budget = extern struct
 };
 
 
-// Parameters of new #VmaAllocation.
+// Parameters of new #Allocation.
 
-// To be used with functions like vmaCreateBuffer(), vmaCreateImage(), and many others.
+// To be used with functions like createBuffer(), createImage(), and many others.
 pub const AllocationCreateInfo = extern struct
 {
     /// Use #VmaAllocationCreateFlagBits enum.
@@ -436,7 +1068,7 @@ pub const AllocationInfo = extern struct
 };
 
 /// Extended parameters of a #VmaAllocation object that can be retrieved using function vmaGetAllocationInfo2().
-pub const VmaAllocationInfo2 = extern struct
+pub const AllocationInfo2 = extern struct
 {
     // Basic parameters of the allocation.
     //
@@ -454,18 +1086,15 @@ pub const VmaAllocationInfo2 = extern struct
     dedicatedMemory: vk.Bool32,
 };
 
-
 // Callback function called during beginDefragmentation() to check custom criterion about ending current defragmentation pass.
 //
 // Should return true if the defragmentation needs to stop current pass.
-pub const PfnCheckDefragmentationBreakFunction = ?*const fn (p_user_data: ?*anyopaque) VkBool32;
-
-
+pub const PfnCheckDefragmentationBreakFunction = ?*const fn (p_user_data: ?*anyopaque) vk.Bool32;
 
 // Parameters for defragmentation.
 //
 // To be used with function vmaBeginDefragmentation().
-pub const VmaDefragmentationInfo = extern struct
+pub const DefragmentationInfo = extern struct
 {
     /// \brief Use combination of #VmaDefragmentationFlagBits.
     flags: DefragmentationFlags,
@@ -490,7 +1119,7 @@ pub const VmaDefragmentationInfo = extern struct
 };
 
 /// Single move of an allocation to be done for defragmentation.
-pub const VmaDefragmentationMove = extern struct
+pub const DefragmentationMove = extern struct
 {
     /// Operation to be performed on the allocation by vmaEndDefragmentationPass(). Default value is #VMA_DEFRAGMENTATION_MOVE_OPERATION_COPY. You can modify it.
     operation: DefragmentationMoveOperation,
@@ -508,7 +1137,7 @@ pub const VmaDefragmentationMove = extern struct
 // Parameters for incremental defragmentation steps.
 //
 // To be used with function vmaBeginDefragmentationPass().
-pub const VmaDefragmentationPassMoveInfo = extern struct
+pub const DefragmentationPassMoveInfo = extern struct
 {
     /// Number of elements in the `pMoves` array.
     move_count: u32,
@@ -539,7 +1168,7 @@ pub const VmaDefragmentationPassMoveInfo = extern struct
 
 
 /// Statistics returned for defragmentation process in function endDefragmentation().
-pub const VmaDefragmentationStats = extern struct
+pub const DefragmentationStats = extern struct
 {
     /// Total number of bytes that have been copied while moving allocations to different places.
     bytes_moved: vk.DeviceSize,
@@ -553,7 +1182,7 @@ pub const VmaDefragmentationStats = extern struct
 
 
 /// Parameters of created VirtualBlock object to be passed to createVirtualBlock().
-pub const VmaVirtualBlockCreateInfo = extern struct
+pub const VirtualBlockCreateInfo = extern struct
 {
     // Total size of the virtual block.
     //
@@ -615,6 +1244,7 @@ pub fn createAllocator(p_create_info: *const AllocatorCreateInfo, p_allocator: *
     const result = vmaCreateAllocator(p_create_info, p_allocator);
     switch (result) {
         vk.Result.success => {},
+        else => return error.Unknown,
     }
     return result;
 }
@@ -729,7 +1359,7 @@ extern fn vmaFindMemoryTypeIndexForImageInfo(
     allocator: Allocator,
     p_image_create_info: *const vk.ImageCreateInfo,
     p_allocation_create_info: *const AllocationCreateInfo,
-    p_memory_type_index: *u32) VkResult;
+    p_memory_type_index: *u32) vk.Result;
 
 // Allocates Vulkan device memory and creates #VmaPool object.
 //
@@ -1425,7 +2055,7 @@ extern fn vmaCreateAliasingBuffer2(
     allocator: Allocator,
     allocation: Allocation,
     allocationLocalOffset: vk.DeviceSize ,
-    pBufferCreateInfo: *const VkBufferCreateInfo,
+    pBufferCreateInfo: *const vk.BufferCreateInfo,
     pBuffer: *vk.Buffer) vk.Result;
 
 // Destroys Vulkan buffer and frees allocated memory.
@@ -1525,7 +2155,7 @@ extern fn vmaVirtualAllocate(
     virtualBlock: VirtualBlock,
     pCreateInfo: *const VirtualAllocationCreateInfo,
     pAllocation: VirtualAllocation,
-    pOffset: ?*VkDeviceSize) vk.Result;
+    pOffset: ?*vk.DeviceSize) vk.Result;
 
 // Frees virtual allocation inside given #VmaVirtualBlock.
 //
