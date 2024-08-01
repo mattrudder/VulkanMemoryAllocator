@@ -4,11 +4,19 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const vk = b.addModule("vk", .{
+        .root_source_file = b.path("vk.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const zvma = b.addModule("root", .{
         .root_source_file = b.path("lib.zig"),
         .target = target,
         .optimize = optimize,
     });
+
+    zvma.addImport("vk", vk);
+    
     const vma = b.addStaticLibrary(.{
         .name = "vma",
         .target = target,

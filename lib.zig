@@ -1,4 +1,4 @@
-pub const vk = @import("vk.zig");
+pub const vk = @import("vk");
 
 pub const Allocator = enum(usize) { null_handle = 0, _ };
 pub const Allocation = enum(usize) { null_handle = 0, _ };
@@ -7,15 +7,9 @@ pub const VirtualAllocation = enum(u64) { null_handle = 0, _ };
 pub const VirtualBlock = enum(usize) { null_handle = 0, _ };
 pub const Pool = enum(usize) { null_handle = 0, _ };
 
-
-
-
 /// \brief Intended usage of the allocated memory.
 pub const MemoryUsage = packed struct(vk.Flags)
 {
-    // No intended memory usage specified.
-    // Use other members of VmaAllocationCreateInfo to specify your requirements.
-    unknown: bool = false,
     // Obsolete, preserved for backward compatibility.
     // Prefers `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`.
     gpu_only: bool = false,
@@ -70,6 +64,7 @@ pub const MemoryUsage = packed struct(vk.Flags)
     // and not with generic memory allocation functions.
     auto_prefer_host: bool = false,
 
+    _reserved_bit_09: bool = false,
     _reserved_bit_10: bool = false,
     _reserved_bit_11: bool = false,
     _reserved_bit_12: bool = false,
@@ -360,15 +355,16 @@ pub const DefragmentationFlagsAlgorithmMask: DefragmentationFlags = .{
 };
 
 /// Operation performed on single defragmentation move. See structure #VmaDefragmentationMove.
+//
+/// Default is copy: Buffer/image has been recreated at `dstTmpAllocation`, data has been copied, old buffer/image has been destroyed. `srcAllocation` should be changed to point to the new place. This is the default value set by vmaBeginDefragmentationPass().
 pub const DefragmentationMoveOperation = packed struct(vk.Flags)
 {
-    /// Buffer/image has been recreated at `dstTmpAllocation`, data has been copied, old buffer/image has been destroyed. `srcAllocation` should be changed to point to the new place. This is the default value set by vmaBeginDefragmentationPass().
-    copy: bool = false,
     /// Set this value if you cannot move the allocation. New place reserved at `dstTmpAllocation` will be freed. `srcAllocation` will remain unchanged.
     ignore: bool = false,
     /// Set this value if you decide to abandon the allocation and you destroyed the buffer/image. New place reserved at `dstTmpAllocation` will be freed, along with `srcAllocation`, which will be destroyed.
     destroy: bool = false,
 
+    _reserved_bit_02: bool = false,
     _reserved_bit_03: bool = false,
     _reserved_bit_04: bool = false,
     _reserved_bit_05: bool = false,
@@ -920,29 +916,29 @@ pub const Budget = extern struct
 pub const AllocationCreateInfo = extern struct
 {
     /// Use #VmaAllocationCreateFlagBits enum.
-    flags: AllocationCreateFlags,
+    flags: AllocationCreateFlags = .{},
     // Intended usage of memory.
     //
     // You can leave #VMA_MEMORY_USAGE_UNKNOWN if you specify memory requirements in other way.
     // If `pool` is not null, this member is ignored.
-    usage: MemoryUsage,
+    usage: MemoryUsage = .{},
     // Flags that must be set in a Memory Type chosen for an allocation.
     //
     // Leave 0 if you specify memory requirements in other way.
     // If `pool` is not null, this member is ignored.
-    required_flags: vk.MemoryPropertyFlags,
+    required_flags: vk.MemoryPropertyFlags = .{},
     // Flags that preferably should be set in a memory type chosen for an allocation.
     //
     // Set to 0 if no additional flags are preferred.
     // If `pool` is not null, this member is ignored.
-    preferred_flags: vk.MemoryPropertyFlags,
+    preferred_flags: vk.MemoryPropertyFlags = .{},
     // Bitmask containing one bit set for every memory type acceptable for this allocation.
     //
     // Value 0 is equivalent to `UINT32_MAX` - it means any memory type is accepted if
     // it meets other requirements specified by this structure, with no further
     // restrictions on memory type index. \n
     // If `pool` is not null, this member is ignored.
-    memory_type_bits: u32,
+    memory_type_bits: u32 = 0,
     // Pool that this allocation should be created in.
     //
     // Leave `.null_handle` to allocate from default pool. If not null, members:
@@ -953,13 +949,13 @@ pub const AllocationCreateInfo = extern struct
     // If #VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT is used, it must be either
     // null or pointer to a null-terminated string. The string will be then copied to
     // internal buffer, so it doesn't need to be valid after allocation call.
-    p_user_data: ?*anyopaque,
+    p_user_data: ?*anyopaque = null,
     // A floating-point value between 0 and 1, indicating the priority of the allocation relative to other memory allocations.
     //
     // It is used only when #VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT flag was used during creation of the #VmaAllocator object
     // and this allocation ends up as dedicated or is explicitly forced as dedicated using #VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT.
     // Otherwise, it has the priority of a memory block where it is placed and this variable is ignored.
-    priority: f32,
+    priority: f32 = 0.0,
 };
 
 /// Describes parameter of created #VmaPool.
@@ -1988,7 +1984,7 @@ extern fn vmaCreateBuffer(
     pAllocationCreateInfo: *const AllocationCreateInfo,
     pBuffer: *vk.Buffer,
     pAllocation: *Allocation,
-    pAllocationInfo: *AllocationInfo) vk.Result;
+    pAllocationInfo: ?*AllocationInfo) vk.Result;
 
 // Creates a buffer with additional minimum alignment.
 //
@@ -2002,7 +1998,7 @@ extern fn vmaCreateBufferWithAlignment(
     minAlignment: vk.DeviceSize ,
     pBuffer: *vk.Buffer,
     pAllocation: *Allocation,
-    pAllocationInfo: *AllocationInfo) vk.Result;
+    pAllocationInfo: ?*AllocationInfo) vk.Result;
 
 // Creates a new `VkBuffer`, binds already created memory for it.
 //
@@ -2073,6 +2069,29 @@ extern fn vmaDestroyBuffer(
     buffer: vk.Buffer,
     allocation: Allocation) void;
 
+pub const CreateImageResult = struct {
+    image: vk.Image,
+    allocation: Allocation,
+    info: AllocationInfo,
+};
+
+pub fn createImage(allocator: Allocator, p_image_create_info: *const vk.ImageCreateInfo, p_allocation_create_info: *const AllocationCreateInfo) !CreateImageResult {
+    var image: vk.Image = .null_handle;
+    var allocation: Allocation = undefined;
+    var info: AllocationInfo = undefined;
+    const result = vmaCreateImage(allocator, p_image_create_info, p_allocation_create_info, &image, &allocation, &info);
+    switch (result) {
+        .success => {
+            return .{
+                .image = image,
+                .allocation = allocation,
+                .info = info,
+            };
+        },
+        else => return error.Unknown,
+    }
+}
+
 /// Function similar to vmaCreateBuffer().
 extern fn vmaCreateImage(
     allocator: Allocator,
@@ -2080,7 +2099,7 @@ extern fn vmaCreateImage(
     pAllocationCreateInfo: *const AllocationCreateInfo,
     pImage: *vk.Image,
     pAllocation: *Allocation,
-    pAllocationInfo: *AllocationInfo) vk.Result;
+    pAllocationInfo: ?*AllocationInfo) vk.Result;
 
 /// Function similar to vmaCreateAliasingBuffer() but for images.
 extern fn vmaCreateAliasingImage(
@@ -2097,6 +2116,13 @@ extern fn vmaCreateAliasingImage2(
     pImageCreateInfo: *const vk.ImageCreateInfo,
     pImage: *vk.Image) vk.Result;
 
+
+pub fn destroyImage(
+    allocator: Allocator,
+    image: vk.Image,
+    allocation: Allocation) void {
+    vmaDestroyImage(allocator, image, allocation);
+}
 // Destroys Vulkan image and frees allocated memory.
 //
 // This is just a convenience function equivalent to:
